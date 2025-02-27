@@ -1,9 +1,10 @@
 use std::ops::Range;
 
 use num::{Complex};
+use rayon::prelude::*;
 
-const WIDTH: usize = 80;
-const HEIGHT: usize = 10;
+const WIDTH: usize = 8000;
+const HEIGHT: usize = 1000;
 
 type C = Complex<f64>;
 
@@ -35,17 +36,16 @@ fn mandelbrot(bound: usize, (xz, yz): (R, R)) -> Box<Image>
     let mut result: Box<Image> = Box::new([[0; WIDTH]; HEIGHT]);
     let x_step = (xz.end - xz.start) / WIDTH as f64;
     let y_step = (yz.end - yz.start) / HEIGHT as f64;
-    #[allow(clippy::needless_range_loop)]
-    let mut y = yz.start;
-    for j in 0..HEIGHT {
-        let mut x = xz.start;
+    // Thanks to DeepSeek for help with this loop.
+    result.par_iter_mut().enumerate().for_each(move |(j, row)| {
+        let y = yz.start + j as f64 * y_step;
+        #[allow(clippy::needless_range_loop)]
         for i in 0..WIDTH {
+            let x = xz.start + i as f64 * x_step;
             let p = escapes(bound, Complex::new(x, y)).unwrap_or(bound + 1);
-            result[j][i] = p;
-            x += x_step;
+            row[i] = p;
         }
-        y += y_step;
-    }
+    });
     result
 }
 
