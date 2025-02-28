@@ -50,11 +50,10 @@ fn mandelbrot(bound: usize, (xz, yz): (R, R)) -> Box<Image>
     gen_iter_mut!(result).enumerate().for_each(move |(j, row)| {
         let y = yz.start + j as f64 * y_step;
         #[allow(clippy::needless_range_loop)]
-        for i in 0..WIDTH {
+        gen_iter_mut!(row).enumerate().for_each(move |(i, v)| {
             let x = xz.start + i as f64 * x_step;
-            let p = escapes(bound, Complex::new(x, y)).unwrap_or(bound + 1);
-            row[i] = p;
-        }
+            *v = escapes(bound, Complex::new(x, y)).unwrap_or(bound + 1);
+        });
     });
     result
 }
