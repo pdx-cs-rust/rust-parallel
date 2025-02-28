@@ -1,10 +1,20 @@
 use std::ops::Range;
 
 use num::{Complex};
+#[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
 const WIDTH: usize = 8000;
 const HEIGHT: usize = 1000;
+
+#[cfg(feature = "rayon")]
+macro_rules! gen_iter_mut {
+    ($r:expr) => { $r.par_iter_mut() };
+}
+#[cfg(not(feature = "rayon"))]
+macro_rules! gen_iter_mut {
+    ($r:expr) => { $r.iter_mut() };
+}
 
 type C = Complex<f64>;
 
@@ -36,8 +46,8 @@ fn mandelbrot(bound: usize, (xz, yz): (R, R)) -> Box<Image>
     let mut result: Box<Image> = Box::new([[0; WIDTH]; HEIGHT]);
     let x_step = (xz.end - xz.start) / WIDTH as f64;
     let y_step = (yz.end - yz.start) / HEIGHT as f64;
-    // Thanks to DeepSeek for help with this loop.
-    result.par_iter_mut().enumerate().for_each(move |(j, row)| {
+    // Thanks to DeepSeek for help with the rayon.
+    gen_iter_mut!(result).enumerate().for_each(move |(j, row)| {
         let y = yz.start + j as f64 * y_step;
         #[allow(clippy::needless_range_loop)]
         for i in 0..WIDTH {
