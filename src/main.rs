@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use ndarray::Array2;
+use ndarray::{Array2, Axis};
 use num::Complex;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -46,10 +46,13 @@ fn mandelbrot(
     let mut result = Array2::zeros((width, height));
     let x_step = (xz.end - xz.start) / width as f64;
     let y_step = (yz.end - yz.start) / width as f64;
-    gen_iter_mut!(result.indexed_iter_mut()).for_each(move |((i, j), v)| {
+    let rows = gen_iter_mut!(result.axis_iter_mut(Axis(0)).enumerate());
+    rows.for_each(move |(j, mut row)| {
         let y = yz.start + j as f64 * y_step;
-        let x = xz.start + i as f64 * x_step;
-        *v = escapes(bound, Complex::new(x, y)).unwrap_or(bound + 1);
+        for (i, v) in row.iter_mut().enumerate() {
+            let x = xz.start + i as f64 * x_step;
+            *v = escapes(bound, Complex::new(x, y)).unwrap_or(bound + 1);
+        }
     });
     result
 }
