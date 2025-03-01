@@ -1,12 +1,11 @@
 use std::ops::Range;
 
-use image::{ImageBuffer, Luma, codecs::png::PngEncoder};
+use clap::Parser;
+use image::{codecs::png::PngEncoder, ImageBuffer, Luma};
 use ndarray::{Array2, Axis};
 use num::Complex;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
-use clap::Parser;
-
 
 #[derive(Debug, Clone)]
 struct Dimensions {
@@ -34,9 +33,9 @@ impl std::str::FromStr for Dimensions {
 
 #[derive(Debug, Parser)]
 struct Args {
-    #[arg(short, long, default_value="80x20")]
+    #[arg(short, long, default_value = "80x20")]
     dims: Dimensions,
-    #[arg(short, long, default_value="255")]
+    #[arg(short, long, default_value = "255")]
     bound: u16,
     #[arg(short, long)]
     ascii: bool,
@@ -45,12 +44,16 @@ struct Args {
 
 #[cfg(feature = "rayon")]
 macro_rules! gen_iter_mut {
-    ($r:expr) => { $r.par_bridge() };
+    ($r:expr) => {
+        $r.par_bridge()
+    };
 }
 
 #[cfg(not(feature = "rayon"))]
 macro_rules! gen_iter_mut {
-    ($r:expr) => { $r };
+    ($r:expr) => {
+        $r
+    };
 }
 
 type C = Complex<f64>;
@@ -59,7 +62,7 @@ fn escapes(bound: u16, c: C) -> Option<u16> {
     let mut z = Complex::new(0.0, 0.0);
     for g in 0..bound {
         if z.norm_sqr() > 4.0 {
-            return Some(g)
+            return Some(g);
         }
         z = z * z + c;
     }
@@ -69,18 +72,14 @@ fn escapes(bound: u16, c: C) -> Option<u16> {
 #[test]
 fn test_escapes() {
     let zero = C::new(0.0, 0.0);
-    assert!(matches!(escapes(10, zero), None));
+    assert!(escapes(10, zero).is_none());
     let two = C::new(2.0, 2.0);
-    assert!(matches!(escapes(10, two), Some(_)));
+    assert!(escapes(10, two).is_some());
 }
 
 type R = Range<f64>;
 
-fn mandelbrot(
-    bound: u16,
-    (width, height): (usize, usize),
-    (xz, yz): (R, R),
-) -> Array2<u16> {
+fn mandelbrot(bound: u16, (width, height): (usize, usize), (xz, yz): (R, R)) -> Array2<u16> {
     let mut result = Array2::zeros((height, width));
     let x_step = (xz.end - xz.start) / width as f64;
     let y_step = (yz.end - yz.start) / width as f64;
@@ -107,7 +106,7 @@ fn open_file(filename: Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
                 eprintln!("output file: {}", e);
                 std::process::exit(1);
             }
-        }
+        },
     }
 }
 
@@ -122,7 +121,6 @@ fn display(f: &mut dyn std::io::Write, a: Array2<u16>) {
                 '*'
             };
             write!(f, "{}", c).unwrap();
-            
         }
         writeln!(f).unwrap();
     }
@@ -148,19 +146,14 @@ fn main() {
     let height = args.dims.height;
 
     let ratio = width as f64 / height as f64;
-    let r = (
-        (-1.0 * ratio..1.0 * ratio),
-        (-1.0..1.0),
-    );
+    let r = ((-1.0 * ratio..1.0 * ratio), (-1.0..1.0));
 
     let m = mandelbrot(args.bound, (width, height), r);
     if args.ascii {
         display(&mut open_file(args.filename), m);
+    } else if args.filename.is_some() {
+        render(&mut open_file(args.filename), m);
     } else {
-        if args.filename.is_some() {
-            render(&mut open_file(args.filename), m);
-        } else {
-            println!("{}", sum(m));
-        }
+        println!("{}", sum(m));
     }
 }
