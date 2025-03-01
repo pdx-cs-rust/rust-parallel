@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use image::{ImageBuffer, Luma, codecs::png::PngEncoder};
 use ndarray::{Array2, Axis};
 use num::Complex;
 #[cfg(feature = "rayon")]
@@ -37,6 +38,9 @@ struct Args {
     dims: Dimensions,
     #[arg(short, long, default_value="255")]
     bound: u16,
+    #[arg(short, long)]
+    ascii: bool,
+    filename: Option<std::path::PathBuf>,
 }
 
 #[cfg(feature = "rayon")]
@@ -85,25 +89,57 @@ fn mandelbrot(
         let y = yz.start + j as f64 * y_step;
         for (i, v) in row.iter_mut().enumerate() {
             let x = xz.start + i as f64 * x_step;
-            *v = escapes(bound, Complex::new(x, y)).unwrap_or(bound + 1);
+            let c = Complex::new(x, y);
+            let e = escapes(bound, c).unwrap_or(bound + 1);
+            let es = e as f64 * u16::MAX as f64 / (bound + 1) as f64;
+            *v = es.floor() as u16;
         }
     });
     result
 }
 
-fn display(a: &Array2<u16>) {
+fn open_file(filename: Option<std::path::PathBuf>) -> Box<dyn std::io::Write> {
+    match filename {
+        None => Box::new(std::io::stdout()),
+        Some(p) => match std::fs::File::create(p) {
+            Ok(f) => Box::new(f),
+            Err(e) => {
+                eprintln!("output file: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+}
+
+fn display(f: &mut dyn std::io::Write, a: Array2<u16>) {
     for row in a.rows() {
-        for v in row {
-            let c = match v {
-                0..10 => ' ',
-                10..100 => '.',
-                _ => '*',
+        for &v in row {
+            let c = if v < 6554 {
+                ' '
+            } else if v < 32767 {
+                '.'
+            } else {
+                '*'
             };
-            print!("{}", c);
+            write!(f, "{}", c).unwrap();
             
         }
-        println!();
+        writeln!(f).unwrap();
     }
+}
+
+fn render(f: &mut dyn std::io::Write, a: Array2<u16>) {
+    let width = a.ncols() as u32;
+    let height = a.nrows() as u32;
+    let (pixels, offset) = a.into_raw_vec_and_offset();
+    assert!(matches!(offset, Some(0)));
+    let img: ImageBuffer<Luma<u16>, _> = ImageBuffer::from_raw(width, height, pixels).unwrap();
+    let encoder = PngEncoder::new(f);
+    img.write_with_encoder(encoder).unwrap();
+}
+
+fn sum(a: Array2<u16>) -> u16 {
+    a.into_iter().fold(0, |acc, v| acc.wrapping_add(v))
 }
 
 fn main() {
@@ -118,5 +154,13 @@ fn main() {
     );
 
     let m = mandelbrot(args.bound, (width, height), r);
-    display(&m);
+    if args.ascii {
+        display(&mut open_file(args.filename), m);
+    } else {
+        if args.filename.is_some() {
+            render(&mut open_file(args.filename), m);
+        } else {
+            println!("{}", sum(m));
+        }
+    }
 }
