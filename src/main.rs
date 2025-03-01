@@ -4,6 +4,40 @@ use ndarray::{Array2, Axis};
 use num::Complex;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
+use clap::Parser;
+
+
+#[derive(Debug, Clone)]
+struct Dimensions {
+    width: usize,
+    height: usize,
+}
+
+// Implementation by DeepSeek.
+impl std::str::FromStr for Dimensions {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split('x').collect();
+        if parts.len() != 2 {
+            eprintln!("invalid dimensions format: expected <width>x<height>.");
+            std::process::exit(1);
+        }
+
+        let width = parts[0].parse::<usize>()?;
+        let height = parts[1].parse::<usize>()?;
+
+        Ok(Dimensions { width, height })
+    }
+}
+
+#[derive(Debug, Parser)]
+struct Args {
+    #[arg(short, long, default_value="80x20")]
+    dims: Dimensions,
+    #[arg(short, long, default_value="255")]
+    bound: u16,
+}
 
 #[cfg(feature = "rayon")]
 macro_rules! gen_iter_mut {
@@ -43,7 +77,7 @@ fn mandelbrot(
     (width, height): (usize, usize),
     (xz, yz): (R, R),
 ) -> Array2<u16> {
-    let mut result = Array2::zeros((width, height));
+    let mut result = Array2::zeros((height, width));
     let x_step = (xz.end - xz.start) / width as f64;
     let y_step = (yz.end - yz.start) / width as f64;
     let rows = gen_iter_mut!(result.axis_iter_mut(Axis(0)).enumerate());
@@ -73,13 +107,16 @@ fn display(a: &Array2<u16>) {
 }
 
 fn main() {
-    let width = 8000;
-    let height = 1000;
+    let args = Args::parse();
+    let width = args.dims.width;
+    let height = args.dims.height;
+
     let ratio = width as f64 / height as f64;
     let r = (
         (-1.0 * ratio..1.0 * ratio),
         (-1.0..1.0),
     );
-    let m = mandelbrot(255, (width, height), r);
+
+    let m = mandelbrot(args.bound, (width, height), r);
     display(&m);
 }
