@@ -4,8 +4,6 @@ use clap::Parser;
 use image::{codecs::png::PngEncoder, ImageBuffer, Luma};
 use ndarray::{Array2, Axis};
 use num::Complex;
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
 
 #[derive(Debug, Clone)]
 struct Dimensions {
@@ -42,20 +40,6 @@ struct Args {
     filename: Option<std::path::PathBuf>,
 }
 
-#[cfg(feature = "rayon")]
-macro_rules! gen_iter_mut {
-    ($r:expr) => {
-        $r.par_bridge()
-    };
-}
-
-#[cfg(not(feature = "rayon"))]
-macro_rules! gen_iter_mut {
-    ($r:expr) => {
-        $r
-    };
-}
-
 type C = Complex<f64>;
 
 fn escapes(bound: u16, c: C) -> Option<u16> {
@@ -83,7 +67,7 @@ fn mandelbrot(bound: u16, (width, height): (usize, usize), (xz, yz): (R, R)) -> 
     let mut result = Array2::zeros((height, width));
     let x_step = (xz.end - xz.start) / width as f64;
     let y_step = (yz.end - yz.start) / width as f64;
-    let rows = gen_iter_mut!(result.axis_iter_mut(Axis(0)).enumerate());
+    let rows = result.axis_iter_mut(Axis(0)).enumerate();
     rows.for_each(move |(j, mut row)| {
         let y = yz.start + j as f64 * y_step;
         for (i, v) in row.iter_mut().enumerate() {

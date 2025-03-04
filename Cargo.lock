@@ -896,7 +896,6 @@ dependencies = [
  "image",
  "ndarray",
  "num",
- "rayon",
 ]
 
 [[package]]
