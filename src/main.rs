@@ -1,3 +1,4 @@
+use std::num::ParseIntError;
 use std::ops::Range;
 
 use clap::Parser;
@@ -6,6 +7,15 @@ use ndarray::{Array2, Axis};
 use num::Complex;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
+use thiserror::Error as ThisError;
+
+#[derive(Debug, ThisError)]
+enum ParseError {
+    #[error("invalid dimensions format: expected <width>x<height>")]
+    Format,
+    #[error("bad number in dimension: {0}")]
+    Number(#[from] ParseIntError),
+}
 
 #[derive(Debug, Clone)]
 struct Dimensions {
@@ -13,15 +23,14 @@ struct Dimensions {
     height: usize,
 }
 
-// Implementation by DeepSeek.
+// Implementation partly by DeepSeek.
 impl std::str::FromStr for Dimensions {
-    type Err = std::num::ParseIntError;
+    type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<&str> = s.split('x').collect();
         if parts.len() != 2 {
-            eprintln!("invalid dimensions format: expected <width>x<height>.");
-            std::process::exit(1);
+            return Err(ParseError::Format);
         }
 
         let width = parts[0].parse::<usize>()?;
